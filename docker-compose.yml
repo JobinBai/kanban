@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  kanban:
+    build: .
+    container_name: kanban-app
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      # Mount a local data directory to persist database and uploads
+      - ./data:/app/data
+    environment:
+      # Point DB and Uploads to the mounted volume
+      - DB_PATH=/app/data/kanban.db
+      - UPLOAD_DIR=/app/data/uploads
