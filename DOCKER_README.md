@@ -4,6 +4,9 @@ A modern, full-stack Kanban board application built with React, Node.js, and SQL
 
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-black?logo=github)](https://github.com/JobinBai/kanban)
 
+![Preview 1](https://raw.githubusercontent.com/JobinBai/kanban/master/preview/01.png)
+![Preview 2](https://raw.githubusercontent.com/JobinBai/kanban/master/preview/02.png)
+
 ## ✨ Features
 
 - **🔐 Authentication**: Secure JWT-based signup and login.

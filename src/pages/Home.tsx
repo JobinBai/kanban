@@ -67,10 +67,10 @@ function ProjectTab({
             ref={setNodeRef} 
             style={style} 
             {...attributes} 
-            {...listeners}
+            {...(isEditing ? {} : listeners)}
             onClick={onClick}
             className={`
-                group relative flex items-center gap-2 px-4 py-2 rounded-t-lg cursor-pointer select-none transition-all border-b-2 min-w-[120px] max-w-[200px] justify-between
+                group relative flex items-center gap-2 px-4 py-2 rounded-t-lg cursor-pointer select-none transition-all border-b-2 min-w-[120px] max-w-[200px] justify-between outline-none
                 ${isActive 
                     ? 'bg-white border-blue-500 text-blue-600 font-bold shadow-sm z-10' 
                     : 'bg-gray-100 border-transparent text-gray-500 hover:bg-gray-200 hover:text-gray-700'
@@ -82,11 +82,15 @@ function ProjectTab({
                     autoFocus
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    onBlur={onSaveEdit}
+                    onBlur={() => {
+                        // Delay save to allow click events on other elements (like switching tabs) to fire first
+                        setTimeout(onSaveEdit, 100);
+                    }}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') onSaveEdit();
                         if (e.key === 'Escape') onSaveEdit(); // Or cancel
                     }}
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                     className="bg-transparent border-b border-blue-500 focus:outline-none w-full text-sm"
                 />
@@ -379,7 +383,10 @@ export default function Home() {
   
   const handleUpdateProjectName = () => {
       if (editingProjectId && editProjectName.trim()) {
-          updateProject(editingProjectId, editProjectName.trim());
+          const project = projects.find(p => p.id === editingProjectId);
+          if (project && project.name !== editProjectName.trim()) {
+              updateProject(editingProjectId, editProjectName.trim());
+          }
       }
       setEditingProjectId(null);
   };
