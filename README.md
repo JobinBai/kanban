@@ -4,6 +4,8 @@
 
 [![Docker Hub](https://img.shields.io/badge/docker-jobinbai%2Fkanban-blue?logo=docker&logoColor=white)](https://hub.docker.com/r/jobinbai/kanban)
 
+![Preview 1](./preview/01.png)
+![Preview 2](./preview/02.png)
 
 ## ✨ 主要特性
 
