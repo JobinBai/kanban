@@ -2,6 +2,9 @@
 
 这是一个基于 React + Node.js 的全栈看板管理系统，支持多用户、多项目管理，提供流畅的拖拽交互体验和现代化的用户界面。
 
+[![Docker Hub](https://img.shields.io/badge/docker-jobinbai%2Fkanban-blue?logo=docker&logoColor=white)](https://hub.docker.com/r/jobinbai/kanban)
+
+
 ## ✨ 主要特性
 
 ### 1. 🔐 用户认证系统
@@ -142,3 +145,7 @@ kanban/
 
 ## 🤝 贡献
 欢迎提交 Issue 或 Pull Request 来改进这个项目！
+
+## 🌟 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=JobinBai/kanban&type=Date)](https://star-history.com/#JobinBai/kanban&Date)

@@ -32,7 +32,7 @@ app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // Serve Uploads - Public access or protected? For simplicity now, public if you have the link
-const uploadsPath = process.env.UPLOAD_DIR || path.resolve(__dirname, '../../uploads')
+const uploadsPath = process.env.UPLOAD_DIR || path.resolve(__dirname, '../uploads')
 app.use('/uploads', express.static(uploadsPath))
 
 /**
@@ -48,7 +48,7 @@ app.use('/api', authenticateToken, attachmentsRoutes)
 /**
  * Serve static files
  */
-const distPath = path.resolve(__dirname, '../../dist')
+const distPath = path.resolve(__dirname, '../dist')
 app.use(express.static(distPath))
 
 /**
@@ -78,9 +78,11 @@ app.get('*', (req: Request, res: Response, next: NextFunction) => {
  * error handler middleware
  */
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('Server Error:', error);
   res.status(500).json({
     success: false,
     error: 'Server internal error',
+    message: process.env.NODE_ENV === 'development' ? error.message : undefined
   })
 })
 

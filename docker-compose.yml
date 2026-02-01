@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   kanban:
-    build: .
+    image: jobinbai/kanban:latest
     container_name: kanban-app
     restart: unless-stopped
     ports:

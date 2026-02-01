@@ -35,3 +35,6 @@ uploads/
 
 # Trae
 .trae
+
+# Docker
+publish_docker.sh

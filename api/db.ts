@@ -115,8 +115,16 @@ const initDb = () => {
     if (!hasProjectId || !hasColor) {
         console.log('Migrating columns table (adding project_id and/or color)...');
         db.pragma('foreign_keys = OFF'); // Disable FKs to allow dropping referenced table
-        const oldColumns = db.prepare('SELECT * FROM columns').all() as any[];
-        db.exec('DROP TABLE columns');
+        
+        let oldColumns = [];
+        try {
+            oldColumns = db.prepare('SELECT * FROM columns').all() as any[];
+        } catch (e) {
+            // Table might not exist yet, which is fine
+            oldColumns = [];
+        }
+
+        db.exec('DROP TABLE IF EXISTS columns');
         db.exec(`
             CREATE TABLE columns (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,10 +135,13 @@ const initDb = () => {
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             )
         `);
-        const insertCol = db.prepare('INSERT INTO columns (id, title, order_index, project_id, color) VALUES (?, ?, ?, ?, ?)');
-        for (const col of oldColumns) {
-            const color = col.color || '#f59e0b';
-            insertCol.run(col.id, col.title, col.order_index, defaultProjectId, color);
+        
+        if (oldColumns.length > 0) {
+            const insertCol = db.prepare('INSERT INTO columns (id, title, order_index, project_id, color) VALUES (?, ?, ?, ?, ?)');
+            for (const col of oldColumns) {
+                const color = col.color || '#f59e0b';
+                insertCol.run(col.id, col.title, col.order_index, defaultProjectId, color);
+            }
         }
         db.pragma('foreign_keys = ON');
     } else {
