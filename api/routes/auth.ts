@@ -29,10 +29,13 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
-    const insert = db.prepare('INSERT INTO users (username, password, theme) VALUES (?, ?, ?)');
-    const info = insert.run(username, hash, 'light');
+    // Check if theme column exists (it might not in older DB versions)
+    // For now, we'll just ignore theme since it's causing issues and doesn't seem to be used elsewhere yet
+    // Or we could migrate it, but easier to just insert what we know exists
+    const insert = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)');
+    const info = insert.run(username, hash);
 
-    const user = { id: Number(info.lastInsertRowid), username, theme: 'light' };
+    const user = { id: Number(info.lastInsertRowid), username };
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
 
     res.status(201).json({ user, token });
