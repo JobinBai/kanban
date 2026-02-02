@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates, arrayMove, horizontalListSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, PlusSquare, LogOut, X, ChevronDown, Lock } from 'lucide-react';
+import { Plus, PlusSquare, LogOut, X, ChevronDown, Lock, Github } from 'lucide-react';
 import { KanbanColumn } from '../components/KanbanColumn';
 import { TaskCard } from '../components/TaskCard';
 import { TaskModal } from '../components/TaskModal';
@@ -527,6 +527,16 @@ export default function Home() {
                             </div>
                         )}
                     </div>
+
+                    <a
+                        href="https://github.com/JobinBai/kanban"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                        title="GitHub Repository"
+                    >
+                        <Github size={20} />
+                    </a>
                 </div>
             </header>
 
