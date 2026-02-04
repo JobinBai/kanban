@@ -36,7 +36,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     const info = insert.run(username, hash);
 
     const user = { id: Number(info.lastInsertRowid), username };
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '30d' });
 
     res.status(201).json({ user, token });
   } catch (error) {
@@ -72,7 +72,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     const tokenPayload = { id: user.id, username: user.username };
-    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '30d' });
 
     res.json({ user: { id: user.id, username: user.username }, token });
   } catch (error) {

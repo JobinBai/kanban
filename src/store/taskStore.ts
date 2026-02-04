@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAuthStore } from './authStore';
 
 export type Priority = number;
 
@@ -168,14 +169,18 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           const token = localStorage.getItem('token');
           const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
           const response = await fetch('/api/projects', { headers });
+
+          if (response.status === 401 || response.status === 403) {
+              useAuthStore.getState().logout();
+              return;
+          }
+
           const data = await response.json();
           if (data.success) {
               set({ projects: data.data });
               // Select first project if none selected
-              if (data.data.length > 0 && !get().currentProjectId) {
-                  const firstId = data.data[0].id;
-                  set({ currentProjectId: firstId });
-                  get().fetchProjectData(firstId);
+              if (!get().currentProjectId && data.data.length > 0) {
+                  get().setCurrentProject(data.data[0].id);
               }
           } else {
               set({ error: data.error });
@@ -202,6 +207,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         fetch(`/api/tasks?project_id=${projectId}`, { headers }),
         fetch(`/api/columns?project_id=${projectId}`, { headers })
       ]);
+
+      if (tasksRes.status === 401 || tasksRes.status === 403 || colsRes.status === 401 || colsRes.status === 403) {
+          useAuthStore.getState().logout();
+          return;
+      }
       
       const tasksData = await tasksRes.json();
       const colsData = await colsRes.json();
@@ -324,6 +334,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
               },
               body: JSON.stringify({ projectIds }),
           });
+          
+          if (response.status === 401 || response.status === 403) {
+              useAuthStore.getState().logout();
+              return;
+          }
+
           const data = await response.json();
           if (!data.success) {
                set({ projects: currentProjects, error: data.error });
