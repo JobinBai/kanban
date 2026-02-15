@@ -1,10 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Ensure the database file is stored in a writable location
 // Using process.cwd() is generally safer when running from root via scripts
@@ -44,10 +40,12 @@ const initDb = () => {
     }
 
     // Projects Table
-    let projectsInfo = [];
+    let projectsInfo: any[] = [];
     try {
         projectsInfo = db.prepare('PRAGMA table_info(projects)').all() as any[];
-    } catch (e) {}
+    } catch (e) {
+        console.error('Failed to get projects table info:', e);
+    }
 
     const hasUserId = projectsInfo.some(col => col.name === 'user_id');
     const hasOrderIndex = projectsInfo.some(col => col.name === 'order_index');
@@ -55,27 +53,32 @@ const initDb = () => {
     if ((!hasUserId || !hasOrderIndex) && projectsInfo.length > 0) {
         console.log('Migrating projects table...');
         db.pragma('foreign_keys = OFF');
-        const oldProjects = db.prepare('SELECT * FROM projects').all() as any[];
-        db.exec('DROP TABLE projects');
-        db.exec(`
-            CREATE TABLE projects (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                description TEXT,
-                user_id INTEGER NOT NULL DEFAULT ${defaultUserId},
-                order_index INTEGER DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            )
-        `);
-        const insertProject = db.prepare('INSERT INTO projects (id, name, description, user_id, order_index, created_at) VALUES (?, ?, ?, ?, ?, ?)');
-        for (const proj of oldProjects) {
-            // Use existing order_index if available, else use id (preserves creation order roughly) or 0
-            const orderIdx = proj.order_index !== undefined ? proj.order_index : proj.id;
-            const userId = proj.user_id !== undefined ? proj.user_id : defaultUserId;
-            insertProject.run(proj.id, proj.name, proj.description, userId, orderIdx, proj.created_at);
+        try {
+            const oldProjects = db.prepare('SELECT * FROM projects').all() as any[];
+            db.exec('DROP TABLE projects');
+            db.exec(`
+                CREATE TABLE projects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    user_id INTEGER NOT NULL DEFAULT ${defaultUserId},
+                    order_index INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            `);
+            const insertProject = db.prepare('INSERT INTO projects (id, name, description, user_id, order_index, created_at) VALUES (?, ?, ?, ?, ?, ?)');
+            for (const proj of oldProjects) {
+                // Use existing order_index if available, else use id (preserves creation order roughly) or 0
+                const orderIdx = proj.order_index !== undefined ? proj.order_index : proj.id;
+                const userId = proj.user_id !== undefined ? proj.user_id : defaultUserId;
+                insertProject.run(proj.id, proj.name, proj.description, userId, orderIdx, proj.created_at);
+            }
+        } catch (e) {
+            console.error('Migration failed for projects table:', e);
+        } finally {
+            db.pragma('foreign_keys = ON');
         }
-        db.pragma('foreign_keys = ON');
     } else {
         db.exec(`
             CREATE TABLE IF NOT EXISTS projects (
@@ -104,10 +107,12 @@ const initDb = () => {
     }
 
     // Check Columns Table Schema
-    let columnsInfo = [];
+    let columnsInfo: any[] = [];
     try {
         columnsInfo = db.prepare('PRAGMA table_info(columns)').all() as any[];
-    } catch (e) {}
+    } catch (e) {
+        console.error('Failed to get columns table info:', e);
+    }
 
     const hasProjectId = columnsInfo.some(col => col.name === 'project_id');
     const hasColor = columnsInfo.some(col => col.name === 'color');
@@ -116,34 +121,39 @@ const initDb = () => {
         console.log('Migrating columns table (adding project_id and/or color)...');
         db.pragma('foreign_keys = OFF'); // Disable FKs to allow dropping referenced table
         
-        let oldColumns = [];
         try {
-            oldColumns = db.prepare('SELECT * FROM columns').all() as any[];
-        } catch (e) {
-            // Table might not exist yet, which is fine
-            oldColumns = [];
-        }
-
-        db.exec('DROP TABLE IF EXISTS columns');
-        db.exec(`
-            CREATE TABLE columns (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                order_index INTEGER NOT NULL DEFAULT 0,
-                project_id INTEGER NOT NULL DEFAULT ${defaultProjectId},
-                color TEXT DEFAULT '#f59e0b',
-                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-            )
-        `);
-        
-        if (oldColumns.length > 0) {
-            const insertCol = db.prepare('INSERT INTO columns (id, title, order_index, project_id, color) VALUES (?, ?, ?, ?, ?)');
-            for (const col of oldColumns) {
-                const color = col.color || '#f59e0b';
-                insertCol.run(col.id, col.title, col.order_index, defaultProjectId, color);
+            let oldColumns: any[] = [];
+            try {
+                oldColumns = db.prepare('SELECT * FROM columns').all() as any[];
+            } catch (e) {
+                // Table might not exist yet, which is fine
+                oldColumns = [];
             }
+
+            db.exec('DROP TABLE IF EXISTS columns');
+            db.exec(`
+                CREATE TABLE columns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    order_index INTEGER NOT NULL DEFAULT 0,
+                    project_id INTEGER NOT NULL DEFAULT ${defaultProjectId},
+                    color TEXT DEFAULT '#f59e0b',
+                    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                )
+            `);
+            
+            if (oldColumns.length > 0) {
+                const insertCol = db.prepare('INSERT INTO columns (id, title, order_index, project_id, color) VALUES (?, ?, ?, ?, ?)');
+                for (const col of oldColumns) {
+                    const color = col.color || '#f59e0b';
+                    insertCol.run(col.id, col.title, col.order_index, defaultProjectId, color);
+                }
+            }
+        } catch (e) {
+            console.error('Migration failed for columns table:', e);
+        } finally {
+            db.pragma('foreign_keys = ON');
         }
-        db.pragma('foreign_keys = ON');
     } else {
         // Ensure table exists if fresh start (though drop/create handled it above, this handles "exists but correct")
         // But wait, the CREATE TABLE IF NOT EXISTS in previous code block was simplistic.
@@ -165,39 +175,46 @@ const initDb = () => {
 
 
     // Tasks Table
-    let tableInfo = [];
+    let tableInfo: any[] = [];
     try {
         tableInfo = db.prepare('PRAGMA table_info(tasks)').all() as any[];
-    } catch (e) {}
+    } catch (e) {
+        console.error('Failed to get tasks table info:', e);
+    }
 
     const hasTaskOrderIndex = tableInfo.some(col => col.name === 'order_index');
 
     if (!hasTaskOrderIndex && tableInfo.length > 0) {
         console.log('Migrating tasks table (adding order_index)...');
-        const oldTasks = db.prepare('SELECT * FROM tasks').all() as any[];
-        
-        db.exec('DROP TABLE tasks');
-        
-        db.exec(`
-            CREATE TABLE tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                description TEXT NOT NULL,
-                column_id INTEGER,
-                priority INTEGER DEFAULT 3 CHECK(priority BETWEEN 1 AND 5),
-                order_index INTEGER DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE CASCADE
-            )
-        `);
+        try {
+            const oldTasks = db.prepare('SELECT * FROM tasks').all() as any[];
+            
+            db.exec('DROP TABLE tasks');
+            
+            db.exec(`
+                CREATE TABLE tasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    column_id INTEGER,
+                    priority INTEGER DEFAULT 3 CHECK(priority BETWEEN 1 AND 5),
+                    order_index INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE CASCADE
+                )
+            `);
 
-        const insert = db.prepare('INSERT INTO tasks (id, title, description, column_id, priority, order_index, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        
-        // We can just use id as order_index for initial migration to keep roughly created order
-        for (const task of oldTasks) {
-             insert.run(task.id, task.title, task.description, task.column_id, task.priority, task.id, task.created_at);
+            const insert = db.prepare('INSERT INTO tasks (id, title, description, column_id, priority, order_index, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+            
+            // We can just use id as order_index for initial migration to keep roughly created order
+            for (const task of oldTasks) {
+                 insert.run(task.id, task.title, task.description, task.column_id, task.priority, task.id, task.created_at);
+            }
+        } catch (e) {
+            console.error('Migration failed for tasks table:', e);
+        } finally {
+            db.pragma('foreign_keys = ON');
         }
-        db.pragma('foreign_keys = ON');
     } else if (tableInfo.length === 0) {
         db.exec(`
             CREATE TABLE tasks (

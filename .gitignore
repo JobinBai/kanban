@@ -36,5 +36,7 @@ uploads/
 # Trae
 .trae
 
+.iflow
+
 # Docker
 publish_docker.sh

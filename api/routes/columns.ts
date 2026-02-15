@@ -1,14 +1,22 @@
-import express from 'express';
+import express, { type Request } from 'express';
 import db from '../db.js';
+import { type AuthRequest } from '../middleware/auth.js';
+import { checkProjectAccess, checkColumnAccess } from '../utils/permissions.js';
 
 const router = express.Router();
 
 // Get columns for a project
-router.get('/', (req, res) => {
+router.get('/', (req: Request, res) => {
   const { project_id } = req.query;
+  const userId = (req as AuthRequest).user?.id;
   
   if (!project_id) {
       res.status(400).json({ success: false, error: 'project_id is required' });
+      return;
+  }
+
+  if (!checkProjectAccess(userId!, Number(project_id))) {
+      res.status(403).json({ success: false, error: 'Unauthorized access to project' });
       return;
   }
 
@@ -25,11 +33,17 @@ router.get('/', (req, res) => {
 });
 
 // Create column
-router.post('/', (req, res) => {
+router.post('/', (req: Request, res) => {
   const { title, project_id, color = '#f59e0b' } = req.body;
+  const userId = (req as AuthRequest).user?.id;
   
   if (!title || !project_id) {
       res.status(400).json({ success: false, error: 'Title and project_id are required' });
+      return;
+  }
+
+  if (!checkProjectAccess(userId!, Number(project_id))) {
+      res.status(403).json({ success: false, error: 'Unauthorized access to project' });
       return;
   }
 
@@ -56,10 +70,16 @@ router.post('/', (req, res) => {
 });
 
 // Update column (title/color)
-router.put('/:id', (req, res) => {
+router.put('/:id', (req: Request, res) => {
   const { title, color } = req.body;
   const { id } = req.params;
+  const userId = (req as AuthRequest).user?.id;
   
+  if (!checkColumnAccess(userId!, Number(id))) {
+      res.status(403).json({ success: false, error: 'Unauthorized access to column' });
+      return;
+  }
+
   if (!title && !color) {
       res.status(400).json({ success: false, error: 'Title or color is required' });
       return;
@@ -94,8 +114,9 @@ router.put('/:id', (req, res) => {
 });
 
 // Batch update for reordering
-router.post('/reorder', (req, res) => {
+router.post('/reorder', (req: Request, res) => {
     const { items } = req.body; // Array of { id, order_index }
+    const userId = (req as AuthRequest).user?.id;
     
     if (!Array.isArray(items)) {
         res.status(400).json({ success: false, error: 'Items array is required' });
@@ -106,6 +127,9 @@ router.post('/reorder', (req, res) => {
         const updateStmt = db.prepare('UPDATE columns SET order_index = ? WHERE id = ?');
         const transaction = db.transaction((columns) => {
             for (const col of columns) {
+                if (!checkColumnAccess(userId!, col.id)) {
+                    throw new Error(`Unauthorized access to column ${col.id}`);
+                }
                 updateStmt.run(col.order_index, col.id);
             }
         });
@@ -119,8 +143,15 @@ router.post('/reorder', (req, res) => {
 });
 
 // Delete column
-router.delete('/:id', (req, res) => {
+router.delete('/:id', (req: Request, res) => {
   const { id } = req.params;
+  const userId = (req as AuthRequest).user?.id;
+
+  if (!checkColumnAccess(userId!, Number(id))) {
+      res.status(403).json({ success: false, error: 'Unauthorized access to column' });
+      return;
+  }
+
   try {
     // Transaction to delete tasks and column
     const deleteTasks = db.prepare('DELETE FROM tasks WHERE column_id = ?');

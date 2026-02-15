@@ -1,23 +1,30 @@
-import express from 'express';
+import express, { type Request } from 'express';
 import db from '../db.js';
+import { type AuthRequest } from '../middleware/auth.js';
+import { checkProjectAccess, checkColumnAccess, checkTaskAccess } from '../utils/permissions.js';
 
 const router = express.Router();
 
-// Get all tasks (optionally filtered by project_id, but usually we fetch by column logic or all and filter in frontend, 
-// BUT better to fetch by project. 
-// However, current simple implementation fetches ALL tasks. 
-// Let's support filtering by project_id via join if needed, or just fetch all and frontend filters.
-// Actually, with multi-project, we should filter by project_id to avoid loading all data.
-// But `tasks` table only has `column_id`. So we need to join columns.
-router.get('/', (req, res) => {
+// Get all tasks (optionally filtered by project_id)
+router.get('/', (req: Request, res) => {
   const { project_id } = req.query;
+  const userId = (req as AuthRequest).user?.id;
 
   try {
     let query = 'SELECT tasks.*, (SELECT COUNT(*) FROM attachments WHERE attachments.task_id = tasks.id) as attachment_count FROM tasks';
-    const params = [];
+    const params: any[] = [];
+
+    // Force filtering by user's projects via join
+    query += ' JOIN columns ON tasks.column_id = columns.id JOIN projects ON columns.project_id = projects.id WHERE projects.user_id = ?';
+    params.push(userId);
 
     if (project_id) {
-        query += ' JOIN columns ON tasks.column_id = columns.id WHERE columns.project_id = ?';
+        // Double check if this project belongs to user
+        if (!checkProjectAccess(userId!, Number(project_id))) {
+             res.status(403).json({ success: false, error: 'Unauthorized access to project' });
+             return;
+        }
+        query += ' AND columns.project_id = ?';
         params.push(project_id);
     }
 
@@ -35,11 +42,18 @@ router.get('/', (req, res) => {
 });
 
 // Create task
-router.post('/', (req, res) => {
+router.post('/', (req: Request, res) => {
   const { title, description, column_id, priority = 3 } = req.body;
+  const userId = (req as AuthRequest).user?.id;
   
   if (!title || !column_id) {
       res.status(400).json({ success: false, error: 'Title and column_id are required' });
+      return;
+  }
+
+  // Check column access
+  if (!checkColumnAccess(userId!, Number(column_id))) {
+      res.status(403).json({ success: false, error: 'Unauthorized access to column' });
       return;
   }
 
@@ -69,9 +83,22 @@ router.post('/', (req, res) => {
 });
 
 // Update task
-router.put('/:id', (req, res) => {
+router.put('/:id', (req: Request, res) => {
   const { title, description, column_id, priority, order_index } = req.body;
   const { id } = req.params;
+  const userId = (req as AuthRequest).user?.id;
+
+  // Check task access
+  if (!checkTaskAccess(userId!, Number(id))) {
+      res.status(403).json({ success: false, error: 'Unauthorized access to task' });
+      return;
+  }
+
+  // If moving to another column, check target column access
+  if (column_id !== undefined && !checkColumnAccess(userId!, Number(column_id))) {
+      res.status(403).json({ success: false, error: 'Unauthorized access to target column' });
+      return;
+  }
   
   try {
     const updates = [];
@@ -118,9 +145,10 @@ router.put('/:id', (req, res) => {
   }
 });
 
-// Batch update for reordering (optional but good for performance)
-router.post('/reorder', (req, res) => {
+// Batch update for reordering
+router.post('/reorder', (req: Request, res) => {
     const { items } = req.body; // Array of { id, order_index, column_id }
+    const userId = (req as AuthRequest).user?.id;
     
     if (!Array.isArray(items)) {
         res.status(400).json({ success: false, error: 'Items array is required' });
@@ -129,8 +157,18 @@ router.post('/reorder', (req, res) => {
 
     try {
         const updateStmt = db.prepare('UPDATE tasks SET order_index = ?, column_id = ? WHERE id = ?');
+        
         const transaction = db.transaction((tasks) => {
             for (const task of tasks) {
+                // Check task ownership
+                if (!checkTaskAccess(userId!, task.id)) {
+                    throw new Error(`Unauthorized access to task ${task.id}`);
+                }
+                // Check target column ownership
+                if (!checkColumnAccess(userId!, task.column_id)) {
+                    throw new Error(`Unauthorized access to column ${task.column_id}`);
+                }
+
                 updateStmt.run(task.order_index, task.column_id, task.id);
             }
         });
@@ -139,13 +177,21 @@ router.post('/reorder', (req, res) => {
         
         res.json({ success: true, message: 'Tasks reordered' });
     } catch (err: any) {
+        // If one fails, transaction rolls back
         res.status(400).json({ success: false, error: err.message });
     }
 });
 
 // Delete task
-router.delete('/:id', (req, res) => {
+router.delete('/:id', (req: Request, res) => {
   const { id } = req.params;
+  const userId = (req as AuthRequest).user?.id;
+
+  if (!checkTaskAccess(userId!, Number(id))) {
+      res.status(403).json({ success: false, error: 'Unauthorized access to task' });
+      return;
+  }
+
   try {
     const stmt = db.prepare('DELETE FROM tasks WHERE id = ?');
     const info = stmt.run(id);
