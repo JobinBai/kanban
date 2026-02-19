@@ -101,7 +101,8 @@ router.delete('/:id', (req: Request, res) => {
             const getCols = db.prepare('SELECT id FROM columns WHERE project_id = ?').all(id) as {id: number}[];
             const colIds = getCols.map(c => c.id);
             if (colIds.length > 0) {
-                db.prepare(`DELETE FROM tasks WHERE column_id IN (${colIds.join(',')})`).run();
+                const placeholders = colIds.map(() => '?').join(',');
+                db.prepare(`DELETE FROM tasks WHERE column_id IN (${placeholders})`).run(...colIds);
                 db.prepare('DELETE FROM columns WHERE project_id = ?').run(id);
             }
             db.prepare('DELETE FROM projects WHERE id = ?').run(id);

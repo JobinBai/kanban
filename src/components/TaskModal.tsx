@@ -171,8 +171,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSubmit,
                     className="hidden"
                     onChange={handleFileChange}
                     multiple
+                    accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.doc,.docx"
                 />
             </div>
+            <p className="text-xs text-gray-500 mb-2">
+              支持格式：图片（JPEG、PNG、GIF、WebP）、PDF、文本文件、Word文档（.doc、.docx），单个文件最大 10MB
+            </p>
             
             {/* Create Mode: Show pending files */}
             {!initialData && pendingFiles.length > 0 && (

@@ -5,7 +5,28 @@ import db from '../db';
 import { authenticateToken, type AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? undefined : 'your-secret-key');
+
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is required in production');
+  process.exit(1);
+}
+
+function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (password.length < 8) {
+      return { valid: false, error: 'Password must be at least 8 characters long' };
+  }
+  if (!/[A-Z]/.test(password)) {
+      return { valid: false, error: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[a-z]/.test(password)) {
+      return { valid: false, error: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[0-9]/.test(password)) {
+      return { valid: false, error: 'Password must contain at least one number' };
+  }
+  return { valid: true };
+}
 
 /**
  * User Register
@@ -16,6 +37,12 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 
   if (!username || !password) {
     res.status(400).json({ error: 'Username and password are required' });
+    return;
+  }
+
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    res.status(400).json({ error: passwordValidation.error });
     return;
   }
 
@@ -130,6 +157,12 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
     const validPassword = await bcrypt.compare(oldPassword, user.password);
     if (!validPassword) {
       res.status(401).json({ error: 'Invalid old password' });
+      return;
+    }
+
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      res.status(400).json({ error: passwordValidation.error });
       return;
     }
 
