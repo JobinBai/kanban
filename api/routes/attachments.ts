@@ -71,7 +71,8 @@ const upload = multer({
         if (allowedTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Invalid file type. Allowed types: Images, PDF, Text, Word docs'), false);
+            // Cast error to any to avoid TypeScript issues with Multer types
+            cb(new Error('Invalid file type. Allowed types: Images, PDF, Text, Word docs') as any, false);
         }
     }
 });
